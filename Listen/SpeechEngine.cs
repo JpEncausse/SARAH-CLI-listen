@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 #if MICRO
 using System.Speech;
@@ -25,13 +26,34 @@ namespace net.encausse.sarah {
         public String Name { get; set; }
         public double Confidence { get; set; }
 
-        public SpeechEngine(String name, String recoId, double confidence) {
+        public SpeechEngine(String name, String recoId, String language, double confidence) {
             this.Name = name;
             this.Confidence = confidence;
-            this.Engine = new SpeechRecognitionEngine(recoId);
+
+            var recoInfo = findReconizerInfo(recoId, language, false);
+            this.Engine  = new SpeechRecognitionEngine(recoInfo);
 
             var info = this.Engine.RecognizerInfo;
             Log("Using Recognizer Id: " + info.Id + " Name: " + info.Name + " Culture: " + info.Culture + " Kinect: " + info.AdditionalInfo.ContainsKey("Kinect"));
+        }
+
+        private RecognizerInfo findReconizerInfo(String recoId, String language, bool findKinect) {
+            RecognizerInfo info = null;
+            try {
+                var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
+                foreach (var recInfo in recognizers) {
+                    Log("Id: " + recInfo.Id + " Name: " + recInfo.Name + " Culture: " + recInfo.Culture + " Kinect: " + recInfo.AdditionalInfo.ContainsKey("Kinect"));
+                    if (!language.Equals(recInfo.Culture.Name, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!String.IsNullOrEmpty(recoId) && recoId.Equals(recInfo.Id, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (findKinect && recInfo.AdditionalInfo.ContainsKey("Kinect"))
+                        continue;
+                    info = recInfo;
+                }
+            }
+            catch (COMException) { }
+            return info;
         }
 
         public void Init() {
@@ -227,8 +249,7 @@ namespace net.encausse.sarah {
 
             // 3. Handle Results
             try {
-                // SpeechManager.GetInstance().SpeechRecognized(this, rr);
-                // FIXME
+                SpeechRecognizedCallback(this, rr);
             }
             catch (Exception ex) {
                 Log("Exception:\n" + ex.StackTrace);
@@ -238,5 +259,40 @@ namespace net.encausse.sarah {
             IsWorking = false;
             Log("SpeechRecognized: " + (DateTime.Now - start).TotalMilliseconds + "ms Text: " + rr.Text);
         }
+
+
+        public bool IsListening = true;
+        protected void SpeechRecognizedCallback(SpeechEngine engine, RecognitionResult rr) {
+            // 1. Handle the Listening global state
+            if (!IsListening) {
+                Log("REJECTED not listening");
+                return;
+            }
+
+            // Compute XPath Navigator
+            // XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+            var text = rr.Text;
+            Console.Write("<JSON>");
+            using (var stream = new MemoryStream()) {
+                rr.Audio.WriteToWaveStream(stream);
+                stream.Position = 0;
+                var base64 = Convert.ToBase64String(stream.GetBuffer());
+                string json = "{ \"text\": \""+ rr.Text.Replace("\"","\\\"") +"\", \"confidence\": "+ rr.Confidence +", \"base64\": \""+ base64 + "\"}";
+                Console.Write(json);
+
+                
+                // stream.Position = 0;
+                // using (FileStream fileStream = new FileStream("F:/temp2.wav", FileMode.CreateNew)) {
+                //    stream.CopyTo(fileStream);
+                // }
+            }
+            Console.Write("</JSON>");
+        }
     }
 }
+
+
+
+
+
+

@@ -76,7 +76,7 @@ namespace net.encausse.sarah {
 
         public void Watch(string path) {
             if (!Directory.Exists(path)) { return; }
-            Log("Watching: " + path);
+            Log("Watching: " + Path.GetFullPath(path));
             this.path = path;
 
             watcher = new AdvancedFileSystemWatcher();
@@ -134,7 +134,7 @@ namespace net.encausse.sarah {
         public void Load(string path, int depth) {
             if (depth <= 0) { return; }
             if (File.Exists(path)) { return; }
-            Log("Searching: " + path);
+            Log("Searching: " + Path.GetFullPath(path));
 
             // Recursive with folders
             string[] folders = Directory.GetDirectories(path);

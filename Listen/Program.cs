@@ -1,5 +1,6 @@
 ﻿using NAudio.Wave;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Speech.AudioFormat;
 using Mono.Options;
@@ -9,7 +10,9 @@ namespace net.encausse.sarah {
         static void Main(string[] args) {
             
             string device = "";
-            string recoId = "";
+            string recognizer = "";
+            string language = "fr-FR";
+            string hotword = "SARAH";
             double confidence = 0.5;
             int deviceId = -1;
             var grammar = "";
@@ -18,7 +21,10 @@ namespace net.encausse.sarah {
             bool help = false;
             var p = new OptionSet() {
                 { "device=", "the device id", v => device = v },
-                { "recoId=", "the recognizer id", v => recoId = v },
+                { "recognizer=", "the recognizer id", v => recognizer = v },
+                { "language=", "the recognizer language", v => language = v },
+                { "grammar=", "the grammar directory", v => grammar = v },
+                { "hotword=", "the hotword (default is SARAH)", v => hotword = v },
                 { "confidence=", "the reconizer confidence", v => confidence = Double.Parse(v) },
                 { "h|help",  "show this message and exit", v => help = v != null },
             };
@@ -37,14 +43,17 @@ namespace net.encausse.sarah {
                 return;
             }
 
-            // Init GrammarManager
+            // Create Speech Engine & Grammar Manager
+            SpeechEngine engine = new SpeechEngine(device, recognizer, language, confidence);
+            GrammarManager.GetInstance().SetEngine(engine, language, hotword);
+
+            grammar = Path.GetFullPath(grammar);
             GrammarManager.GetInstance().Load(grammar, 2);
             GrammarManager.GetInstance().Watch(grammar);
 
-            // Create Speech Engine
-            SpeechEngine engine = new SpeechEngine(device, recoId, confidence);
             engine.Load(GrammarManager.GetInstance().Cache, false);
             engine.Init();
+
 
             // Create Stream
             var buffer = new StreamBuffer();
@@ -65,6 +74,9 @@ namespace net.encausse.sarah {
             engine.SetInputToAudioStream(buffer, info);
             engine.Start();
 
+            // Prevent console from closing
+            Console.WriteLine("Waiting for key pressed...");
+            Console.ReadLine();
         }
 
         static void ShowHelp(OptionSet p) {

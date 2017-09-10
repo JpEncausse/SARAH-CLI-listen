@@ -2,6 +2,8 @@
 using System.IO;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Globalization;
+using System.Xml.XPath;
 
 #if MICRO
 using System.Speech;
@@ -18,6 +20,8 @@ using Microsoft.Speech.AudioFormat;
 namespace net.encausse.sarah {
     class SpeechEngine : IDisposable {
 
+        CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
+
         // -------------------------------------------
         //  CONSTRUCTOR
         // ------------------------------------------
@@ -28,9 +32,10 @@ namespace net.encausse.sarah {
 
         public SpeechEngine(String name, String recoId, String language, double confidence) {
             this.Name = name;
-            this.Confidence = confidence;
+            this.Confidence = confidence; 
 
             var recoInfo = findReconizerInfo(recoId, language, false);
+            if (recoInfo == null) { Log("No recognizer found..."); }
             this.Engine  = new SpeechRecognitionEngine(recoInfo);
 
             var info = this.Engine.RecognizerInfo;
@@ -41,7 +46,9 @@ namespace net.encausse.sarah {
             RecognizerInfo info = null;
             try {
                 var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
+
                 foreach (var recInfo in recognizers) {
+
                     Log("Id: " + recInfo.Id + " Name: " + recInfo.Name + " Culture: " + recInfo.Culture + " Kinect: " + recInfo.AdditionalInfo.ContainsKey("Kinect"));
                     if (!language.Equals(recInfo.Culture.Name, StringComparison.OrdinalIgnoreCase))
                         continue;
@@ -195,7 +202,8 @@ namespace net.encausse.sarah {
         // ------------------------------------------
 
         protected void Log(string msg) {
-            System.Diagnostics.Debug.WriteLine(msg);
+            Console.Error.WriteLine(msg);
+            //System.Diagnostics.Debug.WriteLine(msg);
         }
 
         // -------------------------------------------
@@ -274,10 +282,22 @@ namespace net.encausse.sarah {
             var text = rr.Text;
             Console.Write("<JSON>");
             using (var stream = new MemoryStream()) {
+                
+                XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+                var nav = xnav.Select("/SML/action/*");
+
+                string opts = "";
+                if (nav.Count > 0) { 
+                       opts = "\"options\": {" + Options(nav) + "}, ";
+                }
+                string txt  = "\"text\": \"" + rr.Text.Replace("\"", "\\\"") + "\", ";
+                string conf = "\"confidence\": " + rr.Confidence.ToString(culture) + ", ";
+
                 rr.Audio.WriteToWaveStream(stream);
                 stream.Position = 0;
                 var base64 = Convert.ToBase64String(stream.GetBuffer());
-                string json = "{ \"text\": \""+ rr.Text.Replace("\"","\\\"") +"\", \"confidence\": "+ rr.Confidence +", \"base64\": \""+ base64 + "\"}";
+
+                string json = "{"+ txt + conf + opts + "   \"base64\": \"" + base64 + "\"}";
                 Console.Write(json);
 
                 
@@ -287,6 +307,25 @@ namespace net.encausse.sarah {
                 // }
             }
             Console.Write("</JSON>");
+        }
+
+        protected String Options(XPathNodeIterator it) {
+            String json = "";
+            while (it.MoveNext()) {
+
+                if (it.Current.Name == "confidence")
+                    continue;
+
+                if (it.Current.Name == "uri")
+                    continue;
+
+                if (it.Current.HasChildren) {
+                    
+                    var content = Options(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
+                    json += "\"" + it.Current.Name + "\" : \"" + content + "\", ";
+                }
+            }
+            return json.Equals("") ? it.Current.Value : json.Substring(0, json.Length-2);
         }
     }
 }

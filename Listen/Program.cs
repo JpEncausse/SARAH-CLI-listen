@@ -3,12 +3,15 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Speech.AudioFormat;
+using System.Globalization;
 using Mono.Options;
 
 namespace net.encausse.sarah { 
     class Program {
         static void Main(string[] args) {
-            
+
+            CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
+
             string device = "";
             string recognizer = "";
             string language = "fr-FR";
@@ -25,7 +28,7 @@ namespace net.encausse.sarah {
                 { "language=", "the recognizer language", v => language = v },
                 { "grammar=", "the grammar directory", v => grammar = v },
                 { "hotword=", "the hotword (default is SARAH)", v => hotword = v },
-                { "confidence=", "the reconizer confidence", v => confidence = Double.Parse(v) },
+                { "confidence=", "the reconizer confidence", v => confidence = Double.Parse(v, culture) },
                 { "h|help",  "show this message and exit", v => help = v != null },
             };
 
@@ -47,9 +50,13 @@ namespace net.encausse.sarah {
             SpeechEngine engine = new SpeechEngine(device, recognizer, language, confidence);
             GrammarManager.GetInstance().SetEngine(engine, language, hotword);
 
-            grammar = Path.GetFullPath(grammar);
-            GrammarManager.GetInstance().Load(grammar, 2);
-            GrammarManager.GetInstance().Watch(grammar);
+            if (!String.IsNullOrEmpty(grammar)) {
+                grammar = Path.GetFullPath(grammar);
+                GrammarManager.GetInstance().Load(grammar, 2);
+                GrammarManager.GetInstance().Watch(grammar);
+            } else {
+                GrammarManager.GetInstance().LoadFile("default_"+ language + ".xml");
+            }
 
             engine.Load(GrammarManager.GetInstance().Cache, false);
             engine.Init();

@@ -11,9 +11,10 @@ namespace net.encausse.sarah {
         static void Main(string[] args) {
 
             CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
-
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+            
             string device = "";
-            string recognizer = "";
+            string recognizer = ""; 
             string language = "fr-FR";
             string hotword = "SARAH";
             double confidence = 0.5;

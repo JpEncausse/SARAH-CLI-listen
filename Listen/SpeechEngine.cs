@@ -290,8 +290,9 @@ namespace net.encausse.sarah {
                 if (nav.Count > 0) { 
                        opts = "\"options\": {" + Options(nav) + "}, ";
                 }
-                string txt  = "\"text\": \"" + rr.Text.Replace("\"", "\\\"") + "\", ";
-                string conf = "\"confidence\": " + rr.Confidence.ToString(culture) + ", ";
+
+                string txt   = "\"text\": \"" + rr.Text.Replace("\"", "\\\"").ToString(culture) + "\", ";
+                string conf  = "\"confidence\": " + rr.Confidence.ToString(culture).Replace(",",".") + ", ";
 
                 rr.Audio.WriteToWaveStream(stream);
                 stream.Position = 0;
